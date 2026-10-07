@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Japan · 小雨的旅行日记</title><link rel="stylesheet" href="style.css"></head>
-<body>
-<nav class="nav"><div class="navin"><a class="brand" href="index.html">小雨的旅行日记</a><div class="navlinks"><a href="#places">地点</a><a href="#photos">照片</a><a href="#logs">日志</a><a href="#budget">花费</a></div></div></nav>
-<header class="detailhero" style="background-image:url('https://images.unsplash.com/photo-1490806843957-31f4c9a91c65?auto=format&fit=crop&w=1800&q=85')"><div><a class="back" href="index.html">← 返回旅行项目</a><h1>Japan</h1><p>Tokyo · Kamakura · Suwa · Kyoto · Osaka</p><p>2027.01 · 8 DAYS / 7 NIGHTS</p></div></header>
-<div class="stats"><div class="stat"><small>DATE</small><b>2027.01</b></div><div class="stat"><small>DURATION</small><b>8 DAYS</b></div><div class="stat"><small>PLACES</small><b>5</b></div><div class="stat"><small>BUDGET</small><b>待记录</b></div></div>
-<section class="section" id="places"><div class="title"><small>PLACES</small><h2>旅行地点</h2><p>这一趟旅程经过的地方。</p></div><div class="places"><span class="place">Tokyo 东京</span><span class="place">Kamakura 镰仓</span><span class="place">Suwa 诹访湖</span><span class="place">Kyoto 京都</span><span class="place">Osaka 大阪</span></div></section>
-<section class="section" id="photos"><div class="title"><small>PHOTOGRAPHS</small><h2>旅行照片</h2><p>旅行回来以后，把真正拍下来的照片替换进这里。</p></div><div class="gallery"><div class="photo" style="background-image:url('https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=1200&q=85')"></div><div class="photo" style="background-image:url('https://images.unsplash.com/photo-1524413840807-0c3cb6fa808d?auto=format&fit=crop&w=900&q=85')"></div><div class="photo placeholder">待添加照片</div><div class="photo placeholder">待添加照片</div><div class="photo placeholder">待添加照片</div></div></section>
-<section class="section"><div class="title"><small>ITINERARY</small><h2>旅行路线</h2></div><div class="timeline">
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Japan · 小雨的旅行日记</title><link rel="stylesheet" href="style.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js" defer></script><script src="app.js" defer></script></head>
+<body data-trip-slug="japan">
+<nav class="nav"><div class="navin"><a class="brand" href="index.html">小雨的旅行日记</a><div class="navlinks"><a href="#places">地点</a><a href="#photos">照片</a><a href="#logs">日志</a><a href="#budget">花费</a><a href="#creator">创作者</a></div></div></nav>
+<header class="detailhero" data-trip-hero style="background-image:url('https://images.unsplash.com/photo-1490806843957-31f4c9a91c65?auto=format&fit=crop&w=1800&q=85')"><div><a class="back" href="index.html">← 返回旅行项目</a><h1 data-trip-title>Japan</h1><p data-trip-subtitle>Tokyo · Kamakura · Suwa · Kyoto · Osaka</p><p><span data-trip-date>2027.01</span> · <span data-trip-duration>8 DAYS / 7 NIGHTS</span></p></div></header>
+<div class="stats"><div class="stat"><small>DATE</small><b data-trip-date>2027.01</b></div><div class="stat"><small>DURATION</small><b data-trip-duration>8 DAYS</b></div><div class="stat"><small>PLACES</small><b data-trip-places-count>5</b></div><div class="stat"><small>BUDGET</small><b data-trip-budget>待记录</b></div></div>
+<section class="section" id="places"><div class="title"><small>PLACES</small><h2>旅行地点</h2><p>这一趟旅程经过的地方。</p></div><div class="places" id="placesList"><span class="place">Tokyo 东京</span><span class="place">Kamakura 镰仓</span><span class="place">Suwa 诹访湖</span><span class="place">Kyoto 京都</span><span class="place">Osaka 大阪</span></div></section>
+<section class="section" id="photos"><div class="title"><small>PHOTOGRAPHS</small><h2>旅行照片</h2><p>旅行回来以后，把真正拍下来的照片替换进这里。</p></div><div class="gallery" id="photosList"><div class="photo" style="background-image:url('https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=1200&q=85')"></div><div class="photo" style="background-image:url('https://images.unsplash.com/photo-1524413840807-0c3cb6fa808d?auto=format&fit=crop&w=900&q=85')"></div><div class="photo placeholder">待添加照片</div><div class="photo placeholder">待添加照片</div><div class="photo placeholder">待添加照片</div></div></section>
+<section class="section"><div class="title"><small>ITINERARY</small><h2>旅行路线</h2></div><div class="timeline" id="itineraryList">
 <div class="day"><h3>DAY 01 · Tokyo</h3><p>抵达东京，开始第一天的旅程。这里以后可以补充具体行程。</p></div>
 <div class="day"><h3>DAY 02 · Tokyo</h3><p>涩谷 · 新宿 · 秋叶原 · 池袋等。</p></div>
 <div class="day"><h3>DAY 03 · Kamakura</h3><p>东京往返镰仓的一日旅行。</p></div>
@@ -16,12 +16,18 @@
 <div class="day"><h3>DAY 07 · Osaka</h3><p>京都前往大阪。</p></div>
 <div class="day"><h3>DAY 08 · Osaka</h3><p>大阪最后一天，结束旅程。</p></div>
 </div></section>
-<section class="section" id="logs"><div class="title"><small>TRAVEL NOTES</small><h2>旅行日志</h2><p>回来以后，在这里写下真正发生的故事。</p></div><div class="logs">
+<section class="section" id="logs"><div class="title"><small>TRAVEL NOTES</small><h2>旅行日志</h2><p>回来以后，在这里写下真正发生的故事。</p></div><div class="logs" id="logsList">
 <article class="log"><small>DAY 01 · 2027.01.20</small><h3>东京，第一天</h3><p>等待这趟旅行真正发生以后，再把当天最想留下的话写在这里。</p></article>
 <article class="log"><small>NEW ENTRY</small><h3>下一篇旅行日记</h3><p>旅行结束后，可以继续复制这个日志模块。</p></article>
 </div></section>
-<section class="section" id="budget"><div class="title"><small>TRAVEL EXPENSES</small><h2>旅行花费</h2><p>回来后填写实际金额。</p></div><div class="budget">
-<div class="row"><span>✈️ 交通</span><span>¥ 0</span></div><div class="row"><span>🏨 住宿</span><span>¥ 0</span></div><div class="row"><span>🍜 餐饮</span><span>¥ 0</span></div><div class="row"><span>🎟️ 门票</span><span>¥ 0</span></div><div class="row"><span>🛍️ 购物</span><span>¥ 0</span></div><div class="row total"><span>TOTAL</span><span>¥ 0</span></div></div></section>
+<section class="section" id="budget"><div class="title"><small>TRAVEL EXPENSES</small><h2>旅行花费</h2><p>回来后填写实际金额。</p></div><div class="budget"><div id="expensesList"><div class="row"><span>交通</span><span>¥ 0</span></div><div class="row"><span>住宿</span><span>¥ 0</span></div><div class="row"><span>餐饮</span><span>¥ 0</span></div><div class="row"><span>门票</span><span>¥ 0</span></div><div class="row"><span>购物</span><span>¥ 0</span></div><div class="row total"><span>TOTAL</span><span>¥ 0</span></div></div></div></section>
+<section class="section creator" id="creator"><div class="title"><small>CREATOR</small><h2>创作者管理</h2><p>登录创作者账号后，可以添加地点、照片、日志和花费。</p></div><div class="authbox" data-auth-panel></div>
+<div class="adminpanel" data-admin-only hidden>
+<form class="adminform" data-insert-form="places"><h3>添加地点</h3><label><span>地点名称</span><input name="name" required placeholder="Tokyo"></label><label><span>显示文字</span><input name="label" placeholder="Tokyo 东京"></label><button class="btn" type="submit">保存地点</button><p data-form-message></p></form>
+<form class="adminform" data-insert-form="photos"><h3>添加照片</h3><label><span>照片地址</span><input name="image_url" required placeholder="https://..."></label><label><span>说明</span><input name="caption" placeholder="照片说明"></label><button class="btn" type="submit">保存照片</button><p data-form-message></p></form>
+<form class="adminform" data-insert-form="travel_logs"><h3>添加日志</h3><label><span>日期标签</span><input name="day_label" placeholder="DAY 01"></label><label><span>日期</span><input name="entry_date" type="date"></label><label><span>标题</span><input name="title" required placeholder="东京，第一天"></label><label><span>正文</span><textarea name="body" rows="4" placeholder="写下这一天的故事"></textarea></label><button class="btn" type="submit">保存日志</button><p data-form-message></p></form>
+<form class="adminform" data-insert-form="expenses"><h3>添加花费</h3><label><span>类别</span><input name="category" required placeholder="交通"></label><label><span>金额</span><input name="amount" type="number" min="0" step="0.01" required placeholder="0"></label><button class="btn" type="submit">保存花费</button><p data-form-message></p></form>
+</div></section>
 <section class="section"><div class="backtop"><a class="btn" href="index.html">← 回到我的旅行</a></div></section>
 <footer class="footer"><strong>小雨的旅行日记</strong>Japan · 2027</footer>
 </body></html>
