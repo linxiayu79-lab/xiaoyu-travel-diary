@@ -1,79 +1,95 @@
 (function () {
   const config = window.XIAOYU_SUPABASE;
   const sdk = window.supabase;
-
-  if (!config || !sdk) {
-    return;
-  }
+  if (!config || !sdk) return;
 
   const supabase = sdk.createClient(config.url, config.publishableKey);
+
   const state = {
     session: null,
     isCreator: false,
-    tripSlug: document.body.dataset.tripSlug || null
+    tripSlug: new URLSearchParams(location.search).get("slug")
   };
 
-  const $ = (selector) => document.querySelector(selector);
-  const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => Array.from(document.querySelectorAll(s));
 
-  const escapeHtml = (value) =>
-    String(value ?? "")
+  const escapeHtml = (v) =>
+    String(v ?? "")
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
 
-  const setText = (selector, value) => {
-    if (!value) return;
-    $$(selector).forEach((node) => {
-      node.textContent = value;
-    });
-  };
-
-  const setBackground = (selector, url) => {
-    const node = $(selector);
-    if (node && url) node.style.backgroundImage = `url('${url}')`;
-  };
+  let toastTimer = null;
+  function toast(msg, isError) {
+    let node = $(".toast");
+    if (!node) {
+      node = document.createElement("div");
+      node.className = "toast";
+      document.body.appendChild(node);
+    }
+    node.textContent = msg;
+    node.classList.toggle("error", !!isError);
+    node.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => node.classList.remove("show"), isError ? 4500 : 2200);
+  }
 
   async function selectTable(table, query) {
     try {
-      const response = await query(supabase.from(table));
-      if (response.error) {
-        console.info(`[Supabase] ${table}:`, response.error.message);
+      const res = await query(supabase.from(table));
+      if (res.error) {
+        console.info(`[Supabase] ${table}:`, res.error.message);
         return [];
       }
-      return response.data || [];
-    } catch (error) {
-      console.info(`[Supabase] ${table}:`, error.message);
+      return res.data || [];
+    } catch (e) {
+      console.info(`[Supabase] ${table}:`, e.message);
       return [];
     }
   }
+
+  async function uploadImage(file, folder) {
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error } = await supabase.storage
+      .from("travel-photos")
+      .upload(path, file, { cacheControl: "3600", upsert: false });
+    if (error) throw error;
+    return supabase.storage.from("travel-photos").getPublicUrl(path).data.publicUrl;
+  }
+
+  const isTripPage = () => (location.pathname.split("/").pop() || "index.html") === "trip.html";
+
+  // ================= 认证 =================
 
   async function initAuth() {
     const { data } = await supabase.auth.getSession();
     state.session = data.session;
     await refreshCreatorState();
     renderAuthPanels();
+    refreshAdminUI();
 
     supabase.auth.onAuthStateChange(async (_event, session) => {
       state.session = session;
       await refreshCreatorState();
       renderAuthPanels();
-      toggleCreatorControls();
+      refreshAdminUI();
+      if (isTripPage()) await loadTripDetail();
+      else await loadTrips();
     });
   }
 
   async function refreshCreatorState() {
     state.isCreator = false;
     if (!state.session?.user) return;
-
     const { data, error } = await supabase
       .from("site_creators")
       .select("user_id")
       .eq("user_id", state.session.user.id)
       .maybeSingle();
-
     state.isCreator = !error && Boolean(data);
   }
 
@@ -85,14 +101,15 @@
             <div>
               <small>已登录</small>
               <strong>${escapeHtml(state.session.user.email || "创作者账号")}</strong>
-              <p>${state.isCreator ? "已获得创作者权限，可以编辑旅行内容。" : "账号已登录，等待在 Supabase 中加入创作者名单。"}</p>
+              <p>${state.isCreator ? "已获得创作者权限，可以添加、修改和删除内容。" : "已登录，但还不是创作者。点击「认领创作者身份」即可开始管理（仅第一位登录者可以认领）。"}</p>
             </div>
-            <button class="btn" type="button" data-auth-logout>退出登录</button>
-          </div>
-        `;
+            <div class="authbtns">
+              ${state.isCreator ? "" : `<button class="btn" type="button" data-claim-creator>认领创作者身份</button>`}
+              <button class="btn" type="button" data-auth-logout>退出登录</button>
+            </div>
+          </div>`;
         return;
       }
-
       panel.innerHTML = `
         <form class="authform" data-auth-form>
           <label>
@@ -101,87 +118,222 @@
           </label>
           <button class="btn" type="submit">发送登录链接</button>
           <p data-auth-message>只会发送安全登录链接，不需要在网站里保存密码。</p>
-        </form>
-      `;
+        </form>`;
     });
-
     bindAuthEvents();
-    toggleCreatorControls();
   }
 
   function bindAuthEvents() {
     $$("[data-auth-form]").forEach((form) => {
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
-        const message = form.querySelector("[data-auth-message]");
+        const msg = form.querySelector("[data-auth-message]");
         const email = new FormData(form).get("email");
-        message.textContent = "正在发送登录链接...";
-
+        msg.textContent = "正在发送登录链接...";
         const { error } = await supabase.auth.signInWithOtp({
           email,
-          options: { emailRedirectTo: window.location.href.split("#")[0] }
+          options: { emailRedirectTo: location.href.split("#")[0] }
         });
-
-        message.textContent = error
+        msg.textContent = error
           ? `发送失败：${error.message}`
           : "登录链接已发送，请打开邮箱完成登录。";
       });
     });
 
-    $$("[data-auth-logout]").forEach((button) => {
-      button.addEventListener("click", () => supabase.auth.signOut());
-    });
+    $$("[data-auth-logout]").forEach((b) => b.addEventListener("click", () => supabase.auth.signOut()));
+    $$("[data-claim-creator]").forEach((b) => b.addEventListener("click", claimCreator));
   }
 
-  function toggleCreatorControls() {
+  async function claimCreator() {
+    if (!state.session?.user) return;
+    const { error } = await supabase
+      .from("site_creators")
+      .insert({ user_id: state.session.user.id, email: state.session.user.email });
+    if (error) {
+      toast(`认领失败：${error.message}`, true);
+      return;
+    }
+    state.isCreator = true;
+    toast("恭喜，你现在是创作者了！");
+    renderAuthPanels();
+    refreshAdminUI();
+  }
+
+  function refreshAdminUI() {
     $$("[data-admin-only]").forEach((node) => {
       node.hidden = !state.isCreator;
     });
   }
 
-  async function loadTrips() {
-    const trips = await selectTable("trips", (table) =>
-      table
-        .select("slug,title,subtitle,summary,cover_url,date_label,duration_label,status,display_order")
-        .order("display_order", { ascending: true })
-    );
+  // ================= 首页 =================
 
+  async function loadHeroCover() {
+    const rows = await selectTable("site_settings", (t) =>
+      t.select("value").eq("key", "hero_cover").limit(1)
+    );
+    const hero = $(".hero");
+    if (hero && rows[0]?.value) {
+      hero.style.backgroundImage = `linear-gradient(rgba(255,255,255,.45),rgba(247,245,240,.92)),url('${rows[0].value}')`;
+    }
+  }
+
+  async function loadTrips() {
+    const trips = await selectTable("trips", (t) =>
+      t.select("*").order("display_order", { ascending: true })
+    );
     const list = $("#tripsList");
-    if (!list || trips.length === 0) return;
+    if (!list) return;
+
+    if (!trips.length) {
+      list.innerHTML = `<div class="trip empty"><div><strong>还没有旅行记录</strong><br>${state.isCreator ? "使用下方「新建旅行」开始记录。" : "登录创作者账号后即可添加旅行。"}</div></div>`;
+      refreshAdminUI();
+      return;
+    }
 
     list.innerHTML = trips
       .map((trip) => `
-        <a class="trip" href="${escapeHtml(trip.slug || "japan")}.html">
-          <div class="tripimg" style="background-image:url('${escapeHtml(trip.cover_url)}')"></div>
-          <div class="tripbody">
-            <small>${escapeHtml(trip.status || "TRIP")}</small>
-            <h3>${escapeHtml(trip.title)}</h3>
-            <p>${escapeHtml(trip.subtitle || trip.summary)}</p>
-            <div class="tripmeta">
-              <span>${escapeHtml(trip.duration_label)}</span>
-              <span>${escapeHtml(trip.date_label)}</span>
+        <div class="tripwrap" data-trip-slug="${escapeHtml(trip.slug)}">
+          <a class="trip" href="trip.html?slug=${encodeURIComponent(trip.slug)}">
+            <div class="tripimg" style="background-image:url('${escapeHtml(trip.cover_url || "")}')"></div>
+            <div class="tripbody">
+              <small>${escapeHtml(trip.status || "TRIP")}</small>
+              <h3>${escapeHtml(trip.title)}</h3>
+              <p>${escapeHtml(trip.subtitle || trip.summary || "")}</p>
+              <div class="tripmeta">
+                <span>${escapeHtml(trip.duration_label || "")}</span>
+                <span>${escapeHtml(trip.date_label || "")}</span>
+              </div>
             </div>
+          </a>
+          <div class="tripadmin" data-admin-only hidden>
+            <button class="btn small" type="button" data-trip-up>↑ 上移</button>
+            <button class="btn small" type="button" data-trip-down>↓ 下移</button>
+            <button class="btn small danger" type="button" data-trip-del>删除</button>
           </div>
-        </a>
+        </div>
       `)
       .join("");
+    refreshAdminUI();
   }
 
-  async function loadTripDetail() {
-    if (!state.tripSlug) return;
+  function bindNewTripForm() {
+    const form = $("[data-new-trip-form]");
+    if (!form) return;
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const msg = form.querySelector("[data-form-message]");
+      if (!state.isCreator) {
+        msg.textContent = "请先登录并认领创作者身份（见上方「创作者」区）。";
+        return;
+      }
+      const fd = new FormData(form);
+      const slug = String(fd.get("slug") || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "-");
+      if (!slug) {
+        msg.textContent = "请填写页面标识，例如 beijing-2023。";
+        return;
+      }
+      const payload = {
+        slug,
+        title: fd.get("title") || slug,
+        subtitle: fd.get("subtitle") || "",
+        date_label: fd.get("date_label") || "",
+        duration_label: fd.get("duration_label") || "",
+        status: fd.get("status") || "TRIP",
+        display_order: Date.now()
+      };
+      const file = form.querySelector("input[type=file]").files[0];
+      msg.textContent = "正在保存...";
+      if (file) {
+        try {
+          payload.cover_url = await uploadImage(file, "trip-covers");
+        } catch (err) {
+          msg.textContent = `封面上传失败：${err.message}`;
+          return;
+        }
+      } else if (fd.get("cover_url")) {
+        payload.cover_url = fd.get("cover_url");
+      }
+      const { error } = await supabase.from("trips").insert(payload);
+      if (error) {
+        msg.textContent = `保存失败：${error.message}`;
+        toast(`保存失败：${error.message}`, true);
+        return;
+      }
+      msg.textContent = "已创建，正在刷新...";
+      toast("旅行已创建！");
+      setTimeout(() => location.reload(), 800);
+    });
+  }
 
-    const [trip] = await selectTable("trips", (table) =>
-      table.select("*").eq("slug", state.tripSlug).limit(1)
+  function bindHeroCoverForm() {
+    const form = $("[data-hero-cover-form]");
+    if (!form) return;
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const msg = form.querySelector("[data-form-message]");
+      if (!state.isCreator) {
+        msg.textContent = "请先登录并认领创作者身份。";
+        return;
+      }
+      const file = form.querySelector("input[type=file]").files[0];
+      if (!file) {
+        msg.textContent = "请先选择一张图片。";
+        return;
+      }
+      msg.textContent = "正在上传...";
+      try {
+        const url = await uploadImage(file, "site");
+        const { error } = await supabase
+          .from("site_settings")
+          .upsert({ key: "hero_cover", value: url, updated_at: new Date().toISOString() }, { onConflict: "key" });
+        if (error) throw error;
+        msg.textContent = "已保存，正在刷新...";
+        toast("首页封面已更新！");
+        setTimeout(() => location.reload(), 800);
+      } catch (err) {
+        msg.textContent = `保存失败：${err.message}`;
+      }
+    });
+  }
+
+  // ================= 详情页 =================
+
+  async function loadTripDetail() {
+    if (!state.tripSlug) {
+      const root = $("#tripRoot");
+      if (root) {
+        root.innerHTML = `<div class="empty" style="min-height:40vh"><div><strong>请从首页选择一个旅行</strong><br><a class="btn" href="index.html">← 返回我的旅行</a></div></div>`;
+      }
+      return;
+    }
+
+    const [trip] = await selectTable("trips", (t) =>
+      t.select("*").eq("slug", state.tripSlug).limit(1)
     );
 
-    if (trip) {
-      setText("[data-trip-title]", trip.title);
-      setText("[data-trip-subtitle]", trip.subtitle);
-      setText("[data-trip-date]", trip.date_label);
-      setText("[data-trip-duration]", trip.duration_label);
-      setText("[data-trip-places-count]", trip.places_count);
-      setText("[data-trip-budget]", trip.budget_label);
-      setBackground("[data-trip-hero]", trip.cover_url);
+    const root = $("#tripRoot");
+    if (!trip) {
+      if (root) {
+        root.innerHTML = `<div class="empty" style="min-height:40vh"><div><strong>没有找到这个旅行</strong><br><a class="btn" href="index.html">← 返回我的旅行</a></div></div>`;
+      }
+      return;
+    }
+
+    document.title = `${trip.title} · 小雨的旅行日记`;
+    const setText = (sel, val) => {
+      if (val) $$(sel).forEach((n) => (n.textContent = val));
+    };
+    setText("[data-trip-title]", trip.title);
+    setText("[data-trip-subtitle]", trip.subtitle);
+    setText("[data-trip-date]", trip.date_label);
+    setText("[data-trip-duration]", trip.duration_label);
+
+    const hero = $("[data-trip-hero]");
+    if (hero && trip.cover_url) {
+      hero.style.backgroundImage = `url('${trip.cover_url}')`;
     }
 
     await Promise.all([
@@ -194,102 +346,291 @@
   }
 
   async function loadPlaces() {
-    const places = await selectTable("places", (table) =>
-      table.select("name,label,display_order").eq("trip_slug", state.tripSlug).order("display_order")
+    const places = await selectTable("places", (t) =>
+      t.select("id,name,label,display_order").eq("trip_slug", state.tripSlug).order("display_order")
     );
     const list = $("#placesList");
-    if (!list || places.length === 0) return;
-    list.innerHTML = places.map((place) => `<span class="place">${escapeHtml(place.label || place.name)}</span>`).join("");
+    if (!list) return;
+    $$("[data-trip-places-count]").forEach((n) => (n.textContent = places.length));
+    if (!places.length) {
+      list.innerHTML = `<span class="empty-mini">还没有地点，登录后在下方添加。</span>`;
+      return;
+    }
+    list.innerHTML = places
+      .map((p) => `
+        <span class="place">${escapeHtml(p.label || p.name)}
+          <button class="place-del" type="button" data-del="${p.id}" data-del-table="places" title="删除" data-admin-only hidden>×</button>
+        </span>`)
+      .join("");
+    refreshAdminUI();
   }
 
   async function loadPhotos() {
-    const photos = await selectTable("photos", (table) =>
-      table.select("image_url,caption,display_order").eq("trip_slug", state.tripSlug).order("display_order")
+    const photos = await selectTable("photos", (t) =>
+      t.select("id,image_url,caption,display_order").eq("trip_slug", state.tripSlug).order("display_order")
     );
     const list = $("#photosList");
-    if (!list || photos.length === 0) return;
+    if (!list) return;
+    if (!photos.length) {
+      list.innerHTML = `<div class="photo placeholder">还没有照片，登录后在下方上传</div>`;
+      return;
+    }
     list.innerHTML = photos
-      .map((photo) => `<div class="photo" title="${escapeHtml(photo.caption)}" style="background-image:url('${escapeHtml(photo.image_url)}')"></div>`)
+      .map((p) => `
+        <div class="photo" title="${escapeHtml(p.caption || "")}" style="background-image:url('${escapeHtml(p.image_url)}')">
+          <button class="photo-del" type="button" data-del="${p.id}" data-del-table="photos" title="删除照片" data-admin-only hidden>×</button>
+        </div>`)
       .join("");
+    refreshAdminUI();
   }
 
   async function loadItinerary() {
-    const days = await selectTable("itinerary_days", (table) =>
-      table.select("day_label,title,body,display_order").eq("trip_slug", state.tripSlug).order("display_order")
+    const days = await selectTable("itinerary_days", (t) =>
+      t.select("id,day_label,title,body,display_order").eq("trip_slug", state.tripSlug).order("display_order")
     );
     const list = $("#itineraryList");
-    if (!list || days.length === 0) return;
+    if (!list) return;
+    if (!days.length) {
+      list.innerHTML = `<div class="day"><h3>还没有行程</h3><p>登录后可在下方添加行程。</p></div>`;
+      return;
+    }
     list.innerHTML = days
-      .map((day) => `<div class="day"><h3>${escapeHtml(day.day_label)} · ${escapeHtml(day.title)}</h3><p>${escapeHtml(day.body)}</p></div>`)
+      .map((d) => `
+        <div class="day">
+          <h3>${escapeHtml(d.day_label || "")}${d.title ? ` · ${escapeHtml(d.title)}` : ""}</h3>
+          <p>${escapeHtml(d.body || "")}</p>
+          <button class="item-del" type="button" data-del="${d.id}" data-del-table="itinerary_days" data-admin-only hidden>删除</button>
+        </div>`)
       .join("");
+    refreshAdminUI();
   }
 
   async function loadLogs() {
-    const logs = await selectTable("travel_logs", (table) =>
-      table.select("day_label,entry_date,title,body,display_order").eq("trip_slug", state.tripSlug).order("display_order")
+    const logs = await selectTable("travel_logs", (t) =>
+      t.select("id,day_label,entry_date,title,body,display_order").eq("trip_slug", state.tripSlug).order("display_order")
     );
     const list = $("#logsList");
-    if (!list || logs.length === 0) return;
+    if (!list) return;
+    if (!logs.length) {
+      list.innerHTML = `<article class="log"><small>NO ENTRIES</small><h3>还没有日志</h3><p>登录后可在下方写下第一篇。</p></article>`;
+      return;
+    }
     list.innerHTML = logs
-      .map((log) => `
+      .map((l) => `
         <article class="log">
-          <small>${escapeHtml(log.day_label)}${log.entry_date ? ` · ${escapeHtml(log.entry_date)}` : ""}</small>
-          <h3>${escapeHtml(log.title)}</h3>
-          <p>${escapeHtml(log.body)}</p>
-        </article>
-      `)
+          <small>${escapeHtml(l.day_label || "")}${l.entry_date ? ` · ${escapeHtml(l.entry_date)}` : ""}</small>
+          <h3>${escapeHtml(l.title)}</h3>
+          <p>${escapeHtml(l.body || "")}</p>
+          <button class="item-del" type="button" data-del="${l.id}" data-del-table="travel_logs" data-admin-only hidden>删除</button>
+        </article>`)
       .join("");
+    refreshAdminUI();
   }
 
   async function loadExpenses() {
-    const expenses = await selectTable("expenses", (table) =>
-      table.select("category,amount,currency,display_order").eq("trip_slug", state.tripSlug).order("display_order")
+    const expenses = await selectTable("expenses", (t) =>
+      t.select("id,category,amount,currency,display_order").eq("trip_slug", state.tripSlug).order("display_order")
     );
     const list = $("#expensesList");
-    if (!list || expenses.length === 0) return;
+    if (!list) return;
 
-    const total = expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    list.innerHTML = expenses
-      .map((item) => `
-        <div class="row">
-          <span>${escapeHtml(item.category)}</span>
-          <span>${escapeHtml(item.currency || "¥")} ${Number(item.amount || 0).toLocaleString("zh-CN")}</span>
-        </div>
-      `)
-      .join("") + `<div class="row total"><span>TOTAL</span><span>¥ ${total.toLocaleString("zh-CN")}</span></div>`;
+    const total = expenses.reduce((s, i) => s + Number(i.amount || 0), 0);
+    $$("[data-trip-budget]").forEach((n) => (n.textContent = `¥ ${total.toLocaleString("zh-CN")}`));
+
+    if (!expenses.length) {
+      list.innerHTML = `<div class="row"><span>还没有花费记录</span><span>¥ 0</span></div><div class="row total"><span>TOTAL</span><span>¥ 0</span></div>`;
+      return;
+    }
+    list.innerHTML =
+      expenses
+        .map((i) => `
+          <div class="row">
+            <span>${escapeHtml(i.category)} <button class="item-del inline" type="button" data-del="${i.id}" data-del-table="expenses" data-admin-only hidden>删除</button></span>
+            <span>${escapeHtml(i.currency || "¥")} ${Number(i.amount || 0).toLocaleString("zh-CN")}</span>
+          </div>`)
+        .join("") +
+      `<div class="row total"><span>TOTAL</span><span>¥ ${total.toLocaleString("zh-CN")}</span></div>`;
+    refreshAdminUI();
   }
 
-  function bindAdminForms() {
+  // ================= 添加表单 =================
+
+  function bindInsertForms() {
     $$("[data-insert-form]").forEach((form) => {
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
-        if (!state.isCreator) return;
-
+        const msg = form.querySelector("[data-form-message]");
+        if (!state.isCreator) {
+          msg.textContent = "请先登录并认领创作者身份（见上方「创作者」区）。";
+          return;
+        }
         const table = form.dataset.insertForm;
-        const message = form.querySelector("[data-form-message]");
         const payload = Object.fromEntries(new FormData(form).entries());
         payload.trip_slug = state.tripSlug;
-
         if (payload.amount) payload.amount = Number(payload.amount);
+        payload.display_order = Date.now();
 
-        message.textContent = "正在保存...";
-        const { error } = await supabase.from(table).insert(payload);
-        if (error) {
-          message.textContent = `保存失败：${error.message}`;
+        // 照片表单：支持从文件夹多选上传
+        const fileInput = form.querySelector("input[type=file]");
+        if (fileInput && fileInput.files.length) {
+          msg.textContent = "正在上传照片...";
+          try {
+            const files = Array.from(fileInput.files);
+            const caption = form.querySelector("[name=caption]")?.value || "";
+            for (let i = 0; i < files.length; i++) {
+              const url = await uploadImage(files[i], `trip-${state.tripSlug}`);
+              const { error } = await supabase.from("photos").insert({
+                trip_slug: state.tripSlug,
+                image_url: url,
+                caption,
+                display_order: Date.now() + i
+              });
+              if (error) throw error;
+            }
+            msg.textContent = "照片已上传保存，正在刷新...";
+            toast("照片已保存！");
+            setTimeout(() => location.reload(), 800);
+          } catch (err) {
+            msg.textContent = `保存失败：${err.message}`;
+            toast(`保存失败：${err.message}`, true);
+          }
+          return;
+        }
+        if (fileInput) {
+          msg.textContent = "请先选择照片文件（可从文件夹多选）。";
           return;
         }
 
-        message.textContent = "已保存。";
-        form.reset();
-        await loadTripDetail();
+        msg.textContent = "正在保存...";
+        const { error } = await supabase.from(table).insert(payload);
+        if (error) {
+          msg.textContent = `保存失败：${error.message}`;
+          toast(`保存失败：${error.message}`, true);
+          return;
+        }
+        msg.textContent = "已保存，正在刷新...";
+        toast("已保存！");
+        setTimeout(() => location.reload(), 800);
       });
     });
   }
 
+  function bindTripCoverForm() {
+    const form = $("[data-cover-form]");
+    if (!form) return;
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const msg = form.querySelector("[data-form-message]");
+      if (!state.isCreator) {
+        msg.textContent = "请先登录并认领创作者身份。";
+        return;
+      }
+      const file = form.querySelector("input[type=file]").files[0];
+      if (!file) {
+        msg.textContent = "请先选择一张图片。";
+        return;
+      }
+      msg.textContent = "正在上传...";
+      try {
+        const url = await uploadImage(file, `trip-${state.tripSlug}-cover`);
+        const { error } = await supabase
+          .from("trips")
+          .update({ cover_url: url })
+          .eq("slug", state.tripSlug);
+        if (error) throw error;
+        msg.textContent = "已保存，正在刷新...";
+        toast("封面已更新！");
+        setTimeout(() => location.reload(), 800);
+      } catch (err) {
+        msg.textContent = `保存失败：${err.message}`;
+        toast(`保存失败：${err.message}`, true);
+      }
+    });
+  }
+
+  // ================= 删除与排序（事件委托） =================
+
+  async function moveTrip(wrap, delta) {
+    const slug = wrap.dataset.tripSlug;
+    const trips = await selectTable("trips", (t) =>
+      t.select("id,slug,display_order").order("display_order", { ascending: true })
+    );
+    const idx = trips.findIndex((t) => t.slug === slug);
+    const target = idx + delta;
+    if (idx < 0 || target < 0 || target >= trips.length) return;
+    const a = trips[idx];
+    const b = trips[target];
+    const { error } = await supabase.from("trips").update({ display_order: b.display_order }).eq("id", a.id);
+    if (!error) await supabase.from("trips").update({ display_order: a.display_order }).eq("id", b.id);
+    if (error) {
+      toast(`调整失败：${error.message}`, true);
+      return;
+    }
+    toast("顺序已更新，正在刷新...");
+    setTimeout(() => location.reload(), 600);
+  }
+
+  function bindTripAdminEvents() {
+    document.addEventListener("click", async (e) => {
+      const wrap = e.target.closest(".tripwrap");
+      if (!wrap) return;
+
+      if (e.target.closest("[data-trip-up]")) {
+        await moveTrip(wrap, -1);
+        return;
+      }
+      if (e.target.closest("[data-trip-down]")) {
+        await moveTrip(wrap, 1);
+        return;
+      }
+      if (e.target.closest("[data-trip-del]")) {
+        if (!state.isCreator) return;
+        if (!confirm("确定删除这个旅行吗？它下面的地点、照片、日志、花费也会一起删除。")) return;
+        const { error } = await supabase.from("trips").delete().eq("slug", wrap.dataset.tripSlug);
+        if (error) {
+          toast(`删除失败：${error.message}`, true);
+          return;
+        }
+        toast("已删除，正在刷新...");
+        setTimeout(() => location.reload(), 600);
+      }
+    });
+  }
+
+  function bindDeleteEvents() {
+    document.addEventListener("click", async (e) => {
+      const del = e.target.closest("[data-del]");
+      if (!del) return;
+      if (!state.isCreator) return;
+      if (!confirm("确定删除这条记录吗？")) return;
+      const table = del.dataset.delTable;
+      const { error } = await supabase.from(table).delete().eq("id", del.dataset.del);
+      if (error) {
+        toast(`删除失败：${error.message}`, true);
+        return;
+      }
+      toast("已删除，正在刷新...");
+      setTimeout(() => location.reload(), 600);
+    });
+  }
+
+  // ================= 启动 =================
+
   document.addEventListener("DOMContentLoaded", async () => {
     await initAuth();
-    await loadTrips();
-    await loadTripDetail();
-    bindAdminForms();
+
+    if (isTripPage()) {
+      bindInsertForms();
+      bindTripCoverForm();
+      bindDeleteEvents();
+      await loadTripDetail();
+    } else {
+      loadHeroCover();
+      bindNewTripForm();
+      bindHeroCoverForm();
+      bindTripAdminEvents();
+      bindDeleteEvents();
+      await loadTrips();
+    }
   });
 })();

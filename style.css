@@ -8,3 +8,31 @@
 .btn{background:transparent;color:inherit;cursor:pointer}.creator{border-top:1px solid #e5e1d9}.authbox{max-width:760px;margin:auto;background:#fff;padding:28px;border:1px solid #e8e4dc}.authform{display:grid;gap:18px}.authform label,.adminform label{display:grid;gap:7px;color:#666;font-size:13px}.authform input,.adminform input,.adminform textarea{width:100%;border:1px solid #ddd;background:#faf9f5;padding:12px 13px;font:inherit;color:#333}.authform p,.adminform p,.authstatus p{margin:0;color:#888;font-size:13px}.authstatus{display:flex;align-items:center;justify-content:space-between;gap:20px}.authstatus small{display:block;color:#999;letter-spacing:2px}.authstatus strong{display:block;font:400 22px Georgia,serif;color:#555;margin:4px 0}.adminpanel{max-width:1000px;margin:28px auto 0;display:grid;grid-template-columns:repeat(2,1fr);gap:18px}.adminform{background:#fff;border:1px solid #e8e4dc;padding:24px;display:grid;gap:14px}.adminform h3{font:400 23px Georgia,serif;margin:0 0 4px}
 
 @media(max-width:800px){.authstatus,.adminpanel{display:grid;grid-template-columns:1fr}.adminpanel{gap:14px}}
+
+/* ===== 管理功能样式 ===== */
+[hidden]{display:none !important}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:#333;color:#fff;padding:12px 26px;border-radius:25px;font-size:13px;opacity:0;pointer-events:none;transition:.3s;z-index:99;box-shadow:0 8px 24px #00000022}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.error{background:#a33}
+
+.tripwrap{position:relative;display:flex;flex-direction:column}
+.tripwrap .trip{flex:1}
+.tripadmin{display:flex;gap:8px;margin-top:10px;justify-content:center;flex-wrap:wrap}
+.btn.small{padding:6px 14px;font-size:12px;border-radius:16px}
+.btn.danger{border-color:#b55;color:#b55}
+.btn.danger:hover{background:#b55;color:#fff;border-color:#b55}
+
+.place{position:relative;display:inline-flex;align-items:center;gap:6px}
+.place-del{background:none;border:0;color:#b55;font-size:17px;cursor:pointer;padding:0 3px;line-height:1}
+.photo{position:relative}
+.photo-del{position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:50%;border:0;background:rgba(0,0,0,.55);color:#fff;font-size:14px;cursor:pointer;line-height:1;z-index:2}
+.photo-del:hover{background:#b55}
+.item-del{background:none;border:0;color:#b55;font-size:12px;cursor:pointer;padding:4px 0;text-decoration:underline}
+.item-del.inline{margin-left:8px}
+.empty-mini{color:#999;font-size:13px;padding:10px}
+
+.authbtns{display:flex;gap:10px;flex-wrap:wrap}
+.authbtns .btn{white-space:nowrap}
+
+.adminform select{width:100%;border:1px solid #ddd;background:#faf9f5;padding:12px 13px;font:inherit;color:#333}
+.adminform input[type=file]{padding:9px 10px;cursor:pointer}

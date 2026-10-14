@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>旅行详情 · 小雨的旅行日记</title><link rel="stylesheet" href="style.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js" defer></script><script src="app.js" defer></script></head>
+<body>
+<nav class="nav"><div class="navin"><a class="brand" href="index.html">小雨的旅行日记</a><div class="navlinks"><a href="#places">地点</a><a href="#photos">照片</a><a href="#logs">日志</a><a href="#budget">花费</a><a href="#creator">创作者</a></div></div></nav>
+<main id="tripRoot">
+<header class="detailhero" data-trip-hero><div><a class="back" href="index.html">← 返回旅行项目</a><h1 data-trip-title>旅行</h1><p data-trip-subtitle></p><p><span data-trip-date></span> · <span data-trip-duration></span></p></div></header>
+<div class="stats"><div class="stat"><small>DATE</small><b data-trip-date></b></div><div class="stat"><small>DURATION</small><b data-trip-duration></b></div><div class="stat"><small>PLACES</small><b data-trip-places-count>0</b></div><div class="stat"><small>BUDGET</small><b data-trip-budget>¥ 0</b></div></div>
+<section class="section" id="places"><div class="title"><small>PLACES</small><h2>旅行地点</h2><p>这一趟旅程经过的地方。</p></div><div class="places" id="placesList"></div></section>
+<section class="section" id="photos"><div class="title"><small>PHOTOGRAPHS</small><h2>旅行照片</h2><p>从文件夹选择照片上传，就会自动出现在这里。</p></div><div class="gallery" id="photosList"></div></section>
+<section class="section"><div class="title"><small>ITINERARY</small><h2>旅行路线</h2></div><div class="timeline" id="itineraryList"></div></section>
+<section class="section" id="logs"><div class="title"><small>TRAVEL NOTES</small><h2>旅行日志</h2><p>回来以后，在这里写下真正发生的故事。</p></div><div class="logs" id="logsList"></div></section>
+<section class="section" id="budget"><div class="title"><small>TRAVEL EXPENSES</small><h2>旅行花费</h2><p>回来后填写实际金额。</p></div><div class="budget"><div id="expensesList"></div></div></section>
+<section class="section creator" id="creator"><div class="title"><small>CREATOR</small><h2>创作者管理</h2><p>登录创作者账号后，可以更换封面、添加地点、照片、行程、日志和花费。</p></div><div class="authbox" data-auth-panel></div>
+<div class="adminpanel" data-admin-only hidden>
+<form class="adminform" data-cover-form><h3>更换旅行封面</h3><label><span>从文件夹选择一张图片</span><input type="file" name="cover" accept="image/*"></label><button class="btn" type="submit">保存封面</button><p data-form-message></p></form>
+<form class="adminform" data-insert-form="places"><h3>添加地点</h3><label><span>地点名称</span><input name="name" required placeholder="Tokyo"></label><label><span>显示文字</span><input name="label" placeholder="Tokyo 东京"></label><button class="btn" type="submit">保存地点</button><p data-form-message></p></form>
+<form class="adminform" data-insert-form="photos"><h3>添加照片</h3><label><span>从文件夹选择（可多选）</span><input type="file" name="image_files" accept="image/*" multiple></label><label><span>照片说明（选填，应用到所选照片）</span><input name="caption" placeholder="照片说明"></label><button class="btn" type="submit">上传并保存</button><p data-form-message></p></form>
+<form class="adminform" data-insert-form="itinerary_days"><h3>添加行程</h3><label><span>日期标签</span><input name="day_label" placeholder="DAY 01"></label><label><span>城市标题</span><input name="title" placeholder="Tokyo"></label><label><span>行程内容</span><textarea name="body" rows="3" placeholder="这一天去了哪里、做了什么"></textarea></label><button class="btn" type="submit">保存行程</button><p data-form-message></p></form>
+<form class="adminform" data-insert-form="travel_logs"><h3>添加日志</h3><label><span>日期标签</span><input name="day_label" placeholder="DAY 01"></label><label><span>日期</span><input name="entry_date" type="date"></label><label><span>标题</span><input name="title" required placeholder="东京，第一天"></label><label><span>正文</span><textarea name="body" rows="4" placeholder="写下这一天的故事"></textarea></label><button class="btn" type="submit">保存日志</button><p data-form-message></p></form>
+<form class="adminform" data-insert-form="expenses"><h3>添加花费</h3><label><span>类别</span><input name="category" required placeholder="交通"></label><label><span>金额</span><input name="amount" type="number" min="0" step="0.01" required placeholder="0"></label><button class="btn" type="submit">保存花费</button><p data-form-message></p></form>
+</div></section>
+<section class="section"><div class="backtop"><a class="btn" href="index.html">← 回到我的旅行</a></div></section>
+</main>
+<footer class="footer"><strong>小雨的旅行日记</strong>Keep travelling · Keep recording · Keep remembering.<br><br>© 2026 Xiaoyu's Travel Journal</footer>
+</body></html>

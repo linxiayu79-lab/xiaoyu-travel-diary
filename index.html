@@ -4,12 +4,25 @@
 <nav class="nav"><div class="navin"><a class="brand" href="index.html">小雨的旅行日记</a><div class="navlinks"><a href="#trips">旅行项目</a><a href="#about">关于</a><a href="#creator">创作者</a></div></div></nav>
 <header class="hero"><div><small>TRAVEL JOURNAL · 2026—</small><h1>小雨的旅行日记</h1><p>去看看世界，也记录一路上的自己。</p><p>“每一次出发，都会成为以后想起时的一段故事。”</p></div></header>
 <section class="section" id="trips"><div class="title"><small>MY TRIPS</small><h2>我的旅行</h2><p>点击一段旅程，进入它自己的旅行日记。</p></div>
-<div class="trips" id="tripsList">
-<a class="trip" href="japan.html"><div class="tripimg" style="background-image:url('https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=1000&q=85')"></div><div class="tripbody"><small>UPCOMING TRIP</small><h3>Japan · 日本</h3><p>Tokyo · Kamakura · Suwa · Kyoto · Osaka</p><div class="tripmeta"><span>8 DAYS / 7 NIGHTS</span><span>2027.01</span></div></div></a>
-<div class="trip empty"><div><strong>下一次旅行</strong><br>复制一个旅行模板，就可以继续记录。</div></div>
-<div class="trip empty"><div><strong>新的目的地</strong><br>未来还会去哪里？</div></div>
+<div class="trips" id="tripsList"></div>
+</section>
+<section class="section creator" id="creator"><div class="title"><small>CREATOR</small><h2>创作者管理</h2><p>登录后可以添加新的旅行、调整顺序、更换封面；访客只能浏览公开页面。</p></div>
+<div class="authbox" data-auth-panel></div>
+<div class="adminpanel" data-admin-only hidden>
+<form class="adminform" data-new-trip-form><h3>新建旅行</h3>
+<label><span>页面标识（英文小写，如 beijing-2023）</span><input name="slug" required placeholder="beijing-2023"></label>
+<label><span>标题（如 Beijing · 北京）</span><input name="title" required placeholder="Beijing · 北京"></label>
+<label><span>副标题（如 故宫 · 长城）</span><input name="subtitle" placeholder="故宫 · 长城"></label>
+<label><span>日期标签（如 2023.10）</span><input name="date_label" placeholder="2023.10"></label>
+<label><span>时长标签（如 5 DAYS / 4 NIGHTS）</span><input name="duration_label" placeholder="5 DAYS / 4 NIGHTS"></label>
+<label><span>状态</span><select name="status"><option value="TRIP">TRIP（已出行）</option><option value="UPCOMING TRIP">UPCOMING TRIP（计划中）</option></select></label>
+<label><span>封面图片（从文件夹选择）</span><input type="file" name="cover_file" accept="image/*"></label>
+<label><span>或者：封面图片网址（选填）</span><input name="cover_url" placeholder="https://..."></label>
+<button class="btn" type="submit">创建旅行</button><p data-form-message></p></form>
+<form class="adminform" data-hero-cover-form><h3>更换首页封面</h3>
+<label><span>从文件夹选择一张图片</span><input type="file" name="cover" accept="image/*"></label>
+<button class="btn" type="submit">保存首页封面</button><p data-form-message></p></form>
 </div></section>
 <section class="section" id="about"><div class="title"><small>ABOUT</small><h2>关于这个小站</h2></div><div class="about"><p>这里是小雨的私人旅行档案。每一次旅行都会拥有一个独立的页面：地点、照片、日志、行程与花费，都留在这里。</p><p>网站会随着一次次出发慢慢长大。</p></div></section>
-<section class="section creator" id="creator"><div class="title"><small>CREATOR</small><h2>创作者登录</h2><p>登录后可以管理旅行内容；访客只能浏览公开页面。</p></div><div class="authbox" data-auth-panel></div></section>
 <footer class="footer"><strong>小雨的旅行日记</strong>Keep travelling · Keep recording · Keep remembering.<br><br>© 2026 Xiaoyu's Travel Journal</footer>
 </body></html>
