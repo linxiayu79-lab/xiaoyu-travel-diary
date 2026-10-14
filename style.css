@@ -34,5 +34,11 @@
 .authbtns{display:flex;gap:10px;flex-wrap:wrap}
 .authbtns .btn{white-space:nowrap}
 
+.authtabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.tablink{border-color:#ccc;color:#666}
+.tablink.active{background:#333;color:#fff;border-color:#333}
+.linkbtn{background:none;border:0;color:#b55;font-size:13px;cursor:pointer;text-decoration:underline;padding:0}
+.linkbtn:hover{color:#933}
+
 .adminform select{width:100%;border:1px solid #ddd;background:#faf9f5;padding:12px 13px;font:inherit;color:#333}
 .adminform input[type=file]{padding:9px 10px;cursor:pointer}

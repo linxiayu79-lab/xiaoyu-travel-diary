@@ -111,11 +111,26 @@
         return;
       }
       panel.innerHTML = `
-        <form class="authform" data-auth-form>
-          <label>
-            <span>邮箱</span>
-            <input type="email" name="email" placeholder="输入创作者邮箱" required>
-          </label>
+        <div class="authtabs">
+          <button class="btn small tablink active" type="button" data-authtab="login">密码登录</button>
+          <button class="btn small tablink" type="button" data-authtab="register">注册账号</button>
+          <button class="btn small tablink" type="button" data-authtab="magic">邮箱链接（备用）</button>
+        </div>
+        <form class="authform" data-auth-login-form>
+          <label><span>邮箱</span><input type="email" name="email" placeholder="你的邮箱" required></label>
+          <label><span>密码</span><input type="password" name="password" placeholder="密码" required></label>
+          <button class="btn" type="submit">登录</button>
+          <p data-auth-message></p>
+          <p><button class="linkbtn" type="button" data-auth-reset>忘记密码？点这里发送重置链接</button></p>
+        </form>
+        <form class="authform" data-auth-register-form hidden>
+          <label><span>邮箱</span><input type="email" name="email" placeholder="你的邮箱" required></label>
+          <label><span>设置密码</span><input type="password" name="password" placeholder="至少 6 位" minlength="6" required></label>
+          <button class="btn" type="submit">注册账号</button>
+          <p data-auth-message></p>
+        </form>
+        <form class="authform" data-auth-magic-form hidden>
+          <label><span>邮箱</span><input type="email" name="email" placeholder="输入创作者邮箱" required></label>
           <button class="btn" type="submit">发送登录链接</button>
           <p data-auth-message>只会发送安全登录链接，不需要在网站里保存密码。</p>
         </form>`;
@@ -124,7 +139,64 @@
   }
 
   function bindAuthEvents() {
-    $$("[data-auth-form]").forEach((form) => {
+    // 标签切换
+    $$("[data-authtab]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = btn.dataset.authtab;
+        $$("[data-authtab]").forEach((b) => b.classList.toggle("active", b === btn));
+        const panel = btn.closest("[data-auth-panel]");
+        if (!panel) return;
+        panel.querySelector("[data-auth-login-form]").hidden = target !== "login";
+        panel.querySelector("[data-auth-register-form]").hidden = target !== "register";
+        panel.querySelector("[data-auth-magic-form]").hidden = target !== "magic";
+      });
+    });
+
+    // 邮箱 + 密码登录（手机电脑通用，不跳转）
+    $$("[data-auth-login-form]").forEach((form) => {
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const msg = form.querySelector("[data-auth-message]");
+        const { email, password } = Object.fromEntries(new FormData(form).entries());
+        msg.textContent = "正在登录...";
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+          if (error.message.includes("Invalid login credentials")) {
+            msg.textContent = "邮箱或密码不对；如果是第一次使用，请先在电脑上用「忘记密码？」设置密码。";
+          } else {
+            msg.textContent = `登录失败：${error.message}`;
+          }
+          return;
+        }
+        msg.textContent = "登录成功！";
+        // onAuthStateChange 会自动刷新登录状态
+      });
+    });
+
+    // 注册账号（电脑端设置密码，手机端即可用密码登录）
+    $$("[data-auth-register-form]").forEach((form) => {
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const msg = form.querySelector("[data-auth-message]");
+        const { email, password } = Object.fromEntries(new FormData(form).entries());
+        msg.textContent = "正在创建账号...";
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) {
+          if (error.message.includes("already registered") || error.message.includes("User already")) {
+            msg.textContent = "这个邮箱已经注册过，请直接登录；忘记密码就点「忘记密码？」重置。";
+          } else {
+            msg.textContent = `注册失败：${error.message}`;
+          }
+          return;
+        }
+        msg.textContent = data.session
+          ? "注册成功，已自动登录！"
+          : "注册成功！如果收到确认邮件，请先在电脑上点邮件里的确认链接，然后即可用密码登录。";
+      });
+    });
+
+    // 发送邮箱链接（备用）
+    $$("[data-auth-magic-form]").forEach((form) => {
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         const msg = form.querySelector("[data-auth-message]");
@@ -137,6 +209,29 @@
         msg.textContent = error
           ? `发送失败：${error.message}`
           : "登录链接已发送，请打开邮箱完成登录。";
+      });
+    });
+
+    // 忘记密码：发送重置链接（电脑收信设置新密码）
+    $$("[data-auth-reset]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const panel = btn.closest("[data-auth-panel]");
+        const email = panel?.querySelector("[data-auth-login-form] [name=email]")?.value;
+        if (!email) {
+          const msg = panel?.querySelector("[data-auth-login-form] [data-auth-message]");
+          if (msg) msg.textContent = "请先在上面输入邮箱，再点重置。";
+          return;
+        }
+        const msg = panel?.querySelector("[data-auth-login-form] [data-auth-message]");
+        if (msg) msg.textContent = "正在发送重置链接...";
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: location.href.split("#")[0]
+        });
+        if (msg) {
+          msg.textContent = error
+            ? `发送失败：${error.message}`
+            : "重置链接已发送，请到邮箱（电脑）打开并设置新密码。";
+        }
       });
     });
 
