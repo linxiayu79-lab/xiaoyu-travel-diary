@@ -72,13 +72,34 @@
     renderAuthPanels();
     refreshAdminUI();
 
-    supabase.auth.onAuthStateChange(async (_event, session) => {
+    supabase.auth.onAuthStateChange(async (event, session) => {
       state.session = session;
       await refreshCreatorState();
       renderAuthPanels();
       refreshAdminUI();
       if (isTripPage()) await loadTripDetail();
       else await loadTrips();
+
+      // 点邮件里的重置密码链接回来时，显示"设置新密码"界面
+      if (event === "PASSWORD_RECOVERY") {
+        $$("[data-auth-panel]").forEach((panel) => {
+          panel.innerHTML = `
+            <div class="authstatus">
+              <div>
+                <small>验证成功</small>
+                <strong>请设置新密码</strong>
+                <p>设置完成后，手机和电脑都可以用「邮箱 + 新密码」直接登录，不需要再收邮件。</p>
+              </div>
+            </div>
+            <form class="authform" data-reset-password-form>
+              <label><span>新密码</span><input type="password" name="password" placeholder="至少 6 位" minlength="6" required></label>
+              <label><span>再次输入新密码</span><input type="password" name="confirm" placeholder="再输一遍" required></label>
+              <button class="btn" type="submit">设置新密码</button>
+              <p data-auth-message></p>
+            </form>`;
+        });
+        bindAuthEvents();
+      }
     });
   }
 
@@ -237,6 +258,33 @@
 
     $$("[data-auth-logout]").forEach((b) => b.addEventListener("click", () => supabase.auth.signOut()));
     $$("[data-claim-creator]").forEach((b) => b.addEventListener("click", claimCreator));
+
+    // 设置新密码（点邮件重置链接后出现）
+    $$("[data-reset-password-form]").forEach((form) => {
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const msg = form.querySelector("[data-auth-message]");
+        const { password, confirm } = Object.fromEntries(new FormData(form).entries());
+        if (password !== confirm) {
+          msg.textContent = "两次输入的密码不一致。";
+          return;
+        }
+        if (password.length < 6) {
+          msg.textContent = "密码至少 6 位。";
+          return;
+        }
+        msg.textContent = "正在设置...";
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) {
+          msg.textContent = `设置失败：${error.message}`;
+          return;
+        }
+        toast("密码设置成功！现在可以用邮箱 + 新密码登录了。");
+        await refreshCreatorState();
+        renderAuthPanels();
+        refreshAdminUI();
+      });
+    });
   }
 
   async function claimCreator() {
