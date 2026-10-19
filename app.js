@@ -310,13 +310,24 @@
 
   // ================= 首页 =================
 
+  function applyHeroCover(url) {
+    const hero = $(".hero");
+    if (hero && url) {
+      hero.style.backgroundImage = `linear-gradient(rgba(255,255,255,.45),rgba(247,245,240,.92)),url('${url}')`;
+    }
+  }
+
   async function loadHeroCover() {
+    // 1) 同步应用上次保存的背景（本地缓存），打开网页即显示，不闪默认图
+    const cached = localStorage.getItem("hero_cover");
+    if (cached) applyHeroCover(cached);
+    // 2) 再从数据库读取最新背景，并刷新缓存
     const rows = await selectTable("site_settings", (t) =>
       t.select("value").eq("key", "hero_cover").limit(1)
     );
-    const hero = $(".hero");
-    if (hero && rows[0]?.value) {
-      hero.style.backgroundImage = `linear-gradient(rgba(255,255,255,.45),rgba(247,245,240,.92)),url('${rows[0].value}')`;
+    if (rows[0]?.value) {
+      localStorage.setItem("hero_cover", rows[0].value);
+      applyHeroCover(rows[0].value);
     }
   }
 
@@ -351,6 +362,7 @@
           <div class="tripadmin" data-admin-only hidden>
             <button class="btn small" type="button" data-trip-up>↑ 上移</button>
             <button class="btn small" type="button" data-trip-down>↓ 下移</button>
+            <button class="btn small" type="button" data-trip-edit>编辑</button>
             <button class="btn small danger" type="button" data-trip-del>删除</button>
           </div>
         </div>
@@ -433,6 +445,8 @@
           .from("site_settings")
           .upsert({ key: "hero_cover", value: url, updated_at: new Date().toISOString() }, { onConflict: "key" });
         if (error) throw error;
+        localStorage.setItem("hero_cover", url);
+        applyHeroCover(url);
         msg.textContent = "已保存，正在刷新...";
         toast("首页封面已更新！");
         setTimeout(() => location.reload(), 800);
@@ -475,8 +489,15 @@
     setText("[data-trip-duration]", trip.duration_label);
 
     const hero = $("[data-trip-hero]");
-    if (hero && trip.cover_url) {
-      hero.style.backgroundImage = `url('${trip.cover_url}')`;
+    const cachedCover = localStorage.getItem(`trip_cover_${state.tripSlug}`);
+    if (hero) {
+      // 先应用本地缓存的封面，打开即显示、不闪默认背景
+      if (cachedCover) hero.style.backgroundImage = `url('${cachedCover}')`;
+      // 再以数据库为准并刷新缓存
+      if (trip.cover_url) {
+        localStorage.setItem(`trip_cover_${state.tripSlug}`, trip.cover_url);
+        hero.style.backgroundImage = `url('${trip.cover_url}')`;
+      }
     }
 
     await Promise.all([
@@ -501,9 +522,10 @@
     }
     list.innerHTML = places
       .map((p) => `
-        <span class="place">${escapeHtml(p.label || p.name)}
+        <div class="place" data-entry-id="${p.id}">${escapeHtml(p.label || p.name)}
           <button class="place-del" type="button" data-del="${p.id}" data-del-table="places" title="删除" data-admin-only hidden>×</button>
-        </span>`)
+          <button class="place-edit" type="button" data-edit="places" data-edit-id="${p.id}" title="编辑" data-admin-only hidden>✎</button>
+        </div>`)
       .join("");
     refreshAdminUI();
   }
@@ -520,8 +542,9 @@
     }
     list.innerHTML = photos
       .map((p) => `
-        <div class="photo" title="${escapeHtml(p.caption || "")}" style="background-image:url('${escapeHtml(p.image_url)}')">
+        <div class="photo" data-entry-id="${p.id}" title="${escapeHtml(p.caption || "")}" style="background-image:url('${escapeHtml(p.image_url)}')">
           <button class="photo-del" type="button" data-del="${p.id}" data-del-table="photos" title="删除照片" data-admin-only hidden>×</button>
+          <button class="photo-edit" type="button" data-edit="photos" data-edit-id="${p.id}" title="编辑说明" data-admin-only hidden>✎</button>
         </div>`)
       .join("");
     refreshAdminUI();
@@ -539,10 +562,11 @@
     }
     list.innerHTML = days
       .map((d) => `
-        <div class="day">
+        <div class="day" data-entry-id="${d.id}">
           <h3>${escapeHtml(d.day_label || "")}${d.title ? ` · ${escapeHtml(d.title)}` : ""}</h3>
           <p>${escapeHtml(d.body || "")}</p>
           <button class="item-del" type="button" data-del="${d.id}" data-del-table="itinerary_days" data-admin-only hidden>删除</button>
+          <button class="item-edit" type="button" data-edit="itinerary_days" data-edit-id="${d.id}" data-admin-only hidden>编辑</button>
         </div>`)
       .join("");
     refreshAdminUI();
@@ -560,11 +584,12 @@
     }
     list.innerHTML = logs
       .map((l) => `
-        <article class="log">
+        <article class="log" data-entry-id="${l.id}">
           <small>${escapeHtml(l.day_label || "")}${l.entry_date ? ` · ${escapeHtml(l.entry_date)}` : ""}</small>
           <h3>${escapeHtml(l.title)}</h3>
           <p>${escapeHtml(l.body || "")}</p>
           <button class="item-del" type="button" data-del="${l.id}" data-del-table="travel_logs" data-admin-only hidden>删除</button>
+          <button class="item-edit" type="button" data-edit="travel_logs" data-edit-id="${l.id}" data-admin-only hidden>编辑</button>
         </article>`)
       .join("");
     refreshAdminUI();
@@ -587,8 +612,8 @@
     list.innerHTML =
       expenses
         .map((i) => `
-          <div class="row">
-            <span>${escapeHtml(i.category)} <button class="item-del inline" type="button" data-del="${i.id}" data-del-table="expenses" data-admin-only hidden>删除</button></span>
+          <div class="row" data-entry-id="${i.id}">
+            <span>${escapeHtml(i.category)} <button class="item-del inline" type="button" data-del="${i.id}" data-del-table="expenses" data-admin-only hidden>删除</button><button class="item-edit inline" type="button" data-edit="expenses" data-edit-id="${i.id}" data-admin-only hidden>编辑</button></span>
             <span>${escapeHtml(i.currency || "¥")} ${Number(i.amount || 0).toLocaleString("zh-CN")}</span>
           </div>`)
         .join("") +
@@ -681,6 +706,7 @@
           .update({ cover_url: url })
           .eq("slug", state.tripSlug);
         if (error) throw error;
+        localStorage.setItem(`trip_cover_${state.tripSlug}`, url);
         msg.textContent = "已保存，正在刷新...";
         toast("封面已更新！");
         setTimeout(() => location.reload(), 800);
@@ -757,6 +783,148 @@
     });
   }
 
+  // ================= 编辑已有内容 =================
+
+  const EDIT_FIELDS = {
+    travel_logs: [["day_label", "日期标签", "text"], ["entry_date", "日期", "date"], ["title", "标题", "text"], ["body", "正文", "textarea"]],
+    itinerary_days: [["day_label", "日期标签", "text"], ["title", "城市标题", "text"], ["body", "内容", "textarea"]],
+    places: [["name", "地点名称", "text"], ["label", "显示文字", "text"]],
+    expenses: [["category", "类别", "text"], ["amount", "金额", "number"]],
+    photos: [["caption", "照片说明", "text"]]
+  };
+
+  function buildEditForm(table, row) {
+    const fields = EDIT_FIELDS[table];
+    if (!fields) return "";
+    let html = "";
+    if (table === "photos" && row.image_url) {
+      html += `<div class="editthumb" style="background-image:url('${escapeHtml(row.image_url)}')"></div>`;
+    }
+    html += fields
+      .map(([name, label, type]) => {
+        const val = row[name] ?? "";
+        if (type === "textarea") {
+          return `<label><span>${label}</span><textarea name="${name}" rows="4">${escapeHtml(val)}</textarea></label>`;
+        }
+        if (type === "number") {
+          return `<label><span>${label}</span><input type="number" min="0" step="0.01" name="${name}" value="${escapeHtml(val)}"></label>`;
+        }
+        if (type === "date") {
+          return `<label><span>${label}</span><input type="date" name="${name}" value="${escapeHtml(val)}"></label>`;
+        }
+        return `<label><span>${label}</span><input name="${name}" value="${escapeHtml(val)}"></label>`;
+      })
+      .join("");
+    return `<form class="editform" data-edit-form data-edit-table="${table}" data-edit-id="${row.id}">
+      <h3>编辑内容</h3>
+      ${html}
+      <div class="editbtns">
+        <button class="btn small" type="submit">保存修改</button>
+        <button class="btn small" type="button" data-edit-cancel>取消</button>
+      </div>
+      <p data-form-message></p>
+    </form>`;
+  }
+
+  function buildTripEditForm(trip) {
+    return `<form class="editform" data-trip-edit-form data-trip-slug="${escapeHtml(trip.slug)}">
+      <h3>编辑旅行信息</h3>
+      <label><span>标题</span><input name="title" value="${escapeHtml(trip.title)}" required></label>
+      <label><span>副标题</span><input name="subtitle" value="${escapeHtml(trip.subtitle || "")}"></label>
+      <label><span>日期标签</span><input name="date_label" value="${escapeHtml(trip.date_label || "")}"></label>
+      <label><span>时长标签</span><input name="duration_label" value="${escapeHtml(trip.duration_label || "")}"></label>
+      <label><span>状态</span><select name="status">
+        <option value="TRIP" ${trip.status === "TRIP" ? "selected" : ""}>TRIP（已出行）</option>
+        <option value="UPCOMING TRIP" ${trip.status === "UPCOMING TRIP" ? "selected" : ""}>UPCOMING TRIP（计划中）</option>
+      </select></label>
+      <label><span>封面网址（选填，也可用下方「更换封面」上传）</span><input name="cover_url" value="${escapeHtml(trip.cover_url || "")}"></label>
+      <div class="editbtns">
+        <button class="btn small" type="submit">保存修改</button>
+        <button class="btn small" type="button" data-edit-cancel>取消</button>
+      </div>
+      <p data-form-message></p>
+    </form>`;
+  }
+
+  function bindEditEvents() {
+    // 点「编辑」→ 就地变成编辑表单
+    document.addEventListener("click", async (e) => {
+      const editBtn = e.target.closest("[data-edit]");
+      if (!editBtn) return;
+      if (!state.isCreator) return;
+      const table = editBtn.dataset.edit;
+      const id = editBtn.dataset.editId;
+      const container = editBtn.closest("[data-entry-id]");
+      if (!container) return;
+      const [row] = await selectTable(table, (t) => t.select("*").eq("id", id).limit(1));
+      if (!row) {
+        toast("没有找到这条记录", true);
+        return;
+      }
+      container.innerHTML = buildEditForm(table, row);
+    });
+
+    // 点首页旅行卡片「编辑」→ 卡片下方出现旅行信息编辑表单
+    document.addEventListener("click", async (e) => {
+      const editBtn = e.target.closest("[data-trip-edit]");
+      if (!editBtn) return;
+      if (!state.isCreator) return;
+      const wrap = e.target.closest(".tripwrap");
+      if (!wrap) return;
+      const [trip] = await selectTable("trips", (t) => t.select("*").eq("slug", wrap.dataset.tripSlug).limit(1));
+      if (!trip) return;
+      const admin = wrap.querySelector(".tripadmin");
+      if (admin) admin.innerHTML = buildTripEditForm(trip);
+    });
+
+    // 提交编辑表单
+    document.addEventListener("submit", async (e) => {
+      const tripForm = e.target.closest("[data-trip-edit-form]");
+      if (tripForm) {
+        e.preventDefault();
+        if (!state.isCreator) return;
+        const msg = tripForm.querySelector("[data-form-message]");
+        const payload = Object.fromEntries(new FormData(tripForm).entries());
+        msg.textContent = "正在保存...";
+        const { error } = await supabase.from("trips").update(payload).eq("slug", tripForm.dataset.tripSlug);
+        if (error) {
+          msg.textContent = `保存失败：${error.message}`;
+          toast(`保存失败：${error.message}`, true);
+          return;
+        }
+        msg.textContent = "已保存，正在刷新...";
+        toast("旅行信息已更新！");
+        setTimeout(() => location.reload(), 800);
+        return;
+      }
+
+      const form = e.target.closest("[data-edit-form]");
+      if (!form) return;
+      e.preventDefault();
+      if (!state.isCreator) return;
+      const msg = form.querySelector("[data-form-message]");
+      const payload = Object.fromEntries(new FormData(form).entries());
+      if (payload.amount) payload.amount = Number(payload.amount);
+      msg.textContent = "正在保存...";
+      const { error } = await supabase.from(form.dataset.editTable).update(payload).eq("id", form.dataset.editId);
+      if (error) {
+        msg.textContent = `保存失败：${error.message}`;
+        toast(`保存失败：${error.message}`, true);
+        return;
+      }
+      msg.textContent = "已保存，正在刷新...";
+      toast("已修改！");
+      setTimeout(() => location.reload(), 800);
+    });
+
+    // 取消编辑 → 刷新恢复原样
+    document.addEventListener("click", (e) => {
+      if (e.target.closest("[data-edit-cancel]")) {
+        location.reload();
+      }
+    });
+  }
+
   // ================= 启动 =================
 
   document.addEventListener("DOMContentLoaded", async () => {
@@ -766,6 +934,7 @@
       bindInsertForms();
       bindTripCoverForm();
       bindDeleteEvents();
+      bindEditEvents();
       await loadTripDetail();
     } else {
       loadHeroCover();
@@ -773,6 +942,7 @@
       bindHeroCoverForm();
       bindTripAdminEvents();
       bindDeleteEvents();
+      bindEditEvents();
       await loadTrips();
     }
   });
